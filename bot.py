@@ -115,11 +115,12 @@ class AsyncLoggingHandler(logging.Handler):
                 self.handleError(record)
             self.queue.task_done()
 
-    async def close(self):
-        self.handler.close()
-        if self.storage:
-            await self.storage.flush()
-        await super().close()
+    def close(self):
+        try:
+            self.handler.close()
+        except Exception:
+            pass
+        super().close()
 
 class DiscordBotLogger:
     def __init__(self, base_log_dir="logs"):
@@ -199,7 +200,7 @@ class DiscordBotLogger:
 class DiscordBot(commands.Bot):
     def __init__(self) -> None:
         super().__init__(
-            command_prefix=commands.when_mentioned_or(os.getenv("PREFIX")),
+            command_prefix=commands.when_mentioned_or(os.getenv("PREFIX") or "!"),
             intents=intents,
             help_command=None,
         )
@@ -212,22 +213,17 @@ class DiscordBot(commands.Bot):
         - self.bot.logger # In cogs
         """
         self.logger = DiscordBotLogger()
-        self.storage = None  # Initialize in setup_hook
-        self.bot_prefix = os.getenv("PREFIX")
+        self.bot_prefix = os.getenv("PREFIX") or "!"
         self.invite_link = os.getenv("INVITE_LINK")
         
-        self.db = AsyncJSONStorage(filename="data.json", save_delay=1.0, backup_count=2)
+        self.db = AsyncJSONStorage(filename="data/data.json", save_delay=1.0, backup_count=2)
+        self.storage = self.db  # alias — cogs use bot.db
         self.presence_manager = PresenceManager(self, DEFAULT_STATUS)
         
     async def setup_hook(self) -> None:
         await self.logger.setup(self.loop)
-        self.storage = AsyncJSONStorage(
-            filename="data.json",
-            save_delay=1.0,
-            backup_count=2,
-            logger=self.logger
-        )
-        await self.storage.load()
+        self.db.logger = self.logger
+        await self.db.load()
 
         #self.logger.base_logger.debug("Debug: Bot starting up")
         #self.logger.base_logger.info("Info: Bot starting up")
@@ -243,7 +239,7 @@ class DiscordBot(commands.Bot):
 
     async def load_cogs(self) -> None:
         for file in os.listdir(f"{os.path.realpath(os.path.dirname(__file__))}/cogs"):
-            if file.endswith(".py"):
+            if file.endswith(".py") and file != "template.py":
                 extension = file[:-3]
                 try:
                     await self.load_extension(f"cogs.{extension}")
@@ -264,7 +260,10 @@ class DiscordBot(commands.Bot):
             return
         if message.guild:
             guild_logger = self.logger.get_guild_logger(message.guild, self.loop)
-            guild_logger.info(f"Message from {message.author} in {message.channel}: {message.content}")
+            guild_logger.info(
+                f"Message from {message.author} ({message.author.id}) in #{message.channel} "
+                f"(chars={len(message.content or '')}, attachments={len(message.attachments)})"
+            )
         await self.process_commands(message)
 
     async def on_command_completion(self, context: Context) -> None:
@@ -423,8 +422,13 @@ class DiscordBot(commands.Bot):
             ) 
             
 def main():
+    token = os.getenv("TOKEN")
+    if not token:
+        raise SystemExit(
+            "TOKEN is not set. Copy .env.example to .env and add your bot token."
+        )
     discord_bot = DiscordBot()
-    discord_bot.run(os.getenv("TOKEN"))
+    discord_bot.run(token)
 
 if __name__ == "__main__":
     main()

@@ -1,54 +1,76 @@
 # UO Outland Guild Helper
 
-## Support
+Discord helper bot for the Inv. guild on [UO Outlands](https://uooutlands.com).
 
-## Disclaimer
+## Features
+
+- Boss / mini-boss / other activity call menus (reactions + presence)
+- Cross-guild channel sync via webhooks
+- Giveaways with join/leave buttons
+- Outlands wiki, vendor, and map search shortcuts
+- Moderation (kick, ban, purge, archive)
 
 ## How to set up
 
-To set up the token you will have to make use of the [`.env.example`](.env.example) file; you should rename it to `.env` and replace the `YOUR_BOT...` content with your actual values that match for your bot.
+Copy [`.env.example`](.env.example) to `.env` and replace the placeholder values:
 
-Alternatively you can simply create a system environment variable with the same names and their respective value.
+```
+TOKEN=your_discord_bot_token
+PREFIX=!
+INVITE_LINK=your_bot_invite_url
+```
+
+Alternatively, set the same names as system environment variables.
+
+Enable these privileged intents in the Discord Developer Portal:
+
+- Server Members Intent
+- Message Content Intent
+- Presence Intent
 
 ## How to start
 
-### The _"usual"_ way
+### The "usual" way
 
-To start the bot you simply need to launch, either your terminal (Linux, Mac & Windows), or your Command Prompt (
-Windows)
-.
-
-Before running the bot you will need to install all the requirements with this command:
+Install dependencies:
 
 ```
 python -m pip install -r requirements.txt
 ```
 
-After that you can start it with
+Then start the bot:
 
 ```
 python bot.py
 ```
 
-> **Note**: You may need to replace `python` with `py`, `python3`, `python3.11`, etc. depending on what Python versions you have installed on the machine.
+> **Note**: You may need to replace `python` with `py`, `python3`, `python3.11`, etc. depending on what Python versions you have installed.
+
+After the bot is online, run `!sync guild` (bot owner only) so slash commands appear in the server.
 
 ### Docker
 
-Support to start the bot in a Docker container has been added. After having [Docker](https://docker.com) installed on your machine, you can simply execute:
+After installing [Docker](https://docker.com):
 
 ```
 docker compose up -d --build
 ```
-> **Note**: `-d` will make the container run in detached mode, so in the background.
+
+> **Note**: `-d` runs the container in the background. Bot data is stored in `./data` and logs in `./logs`.
 
 ## Issues or Questions
 
+Open an issue on this repository.
+
 ## Versioning
 
+See [UPDATES.md](UPDATES.md).
+
 ## Built With
--  [Discord.py]  (https://github.com/Rapptz/discord.py)
+
+- [discord.py](https://github.com/Rapptz/discord.py)
 - [Python 3.12.9](https://www.python.org/)
 
 ## License
 
-This project is licensed under the Apache License 2.0 - see the [LICENSE.md](LICENSE.md) file for details
+This project is licensed under the Apache License 2.0 - see the [LICENSE.md](LICENSE.md) file for details.

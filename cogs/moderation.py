@@ -197,10 +197,9 @@ class Moderation(commands.Cog, name="moderation"):
         :param reason: The reason for the ban. Default is "Not specified".
         """
         try:
-            await self.bot.http.ban(user_id, context.guild.id, reason=reason)
-            user = self.bot.get_user(int(user_id)) or await self.bot.fetch_user(
-                int(user_id)
-            )
+            user_id_int = int(user_id)
+            await context.guild.ban(discord.Object(id=user_id_int), reason=reason)
+            user = self.bot.get_user(user_id_int) or await self.bot.fetch_user(user_id_int)
             embed = discord.Embed(
                 description=f"**{user}** (ID: {user_id}) was banned by **{context.author}**!",
                 color=0xBEBEFE,

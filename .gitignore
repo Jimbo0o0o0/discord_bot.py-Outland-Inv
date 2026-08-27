@@ -148,3 +148,4 @@ discord.log
 
 #json database
 *.json
+data/

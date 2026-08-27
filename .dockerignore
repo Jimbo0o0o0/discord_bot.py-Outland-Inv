@@ -1,7 +1,9 @@
 .git/
 .github/
 database/
+data/
 logs/
 venv/
-.env*
+.env
+.env.*
 UPDATES.md

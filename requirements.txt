@@ -2,6 +2,3 @@ aiohttp
 aiofiles
 discord.py==2.6.3
 python-dotenv
-requests
-flask
-flaskcord

@@ -24,6 +24,9 @@ class AsyncJSONStorage:
         self._data: Dict[str, Any] = {}
         self._last_saved: Dict[str, Any] = {}
         self._save_task: Optional[asyncio.Task] = None
+        parent = os.path.dirname(os.path.abspath(self.filename))
+        if parent:
+            os.makedirs(parent, exist_ok=True)
 
     async def __aenter__(self):
         await self.load()

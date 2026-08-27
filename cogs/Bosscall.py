@@ -146,13 +146,19 @@ class BossCall(commands.Cog):
             return True  # No roles specified, allow all
 
         if not hasattr(user, "roles"):
-            await user.send("You do not have permission to call an activity.")
+            try:
+                await user.send("You do not have permission to call an activity.")
+            except Exception:
+                pass
             self._get_guild_logger(guild).warning(f"Non-member tried activity call: {getattr(user, 'id', None)}")
             return False
 
         user_roles = {r.id for r in user.roles}
         if not (user_roles & allowed_roles):
-            await user.send("You do not have permission to call an activity.")
+            try:
+                await user.send("You do not have permission to call an activity.")
+            except Exception:
+                pass
             self._get_guild_logger(guild).warning(f"Unauthorized activity call attempt by {user}")
             return False
 
@@ -225,18 +231,28 @@ class BossCall(commands.Cog):
         self._get_guild_logger(guild).info(f"Blocked global duplicate activity call by {user} ({user.id})")
         return True
 
+    def _format_delay(self, seconds: int) -> str:
+        minutes = max(1, seconds // 60)
+        if minutes == 1:
+            return "1 minute"
+        if minutes < 60:
+            return f"{minutes} minutes"
+        hours = minutes // 60
+        rem = minutes % 60
+        if rem == 0:
+            return f"{hours} hour{'s' if hours != 1 else ''}"
+        return f"{hours}h {rem}m"
+
     # ---------------- Notifications ----------------
-    async def _notify_call_channels(self, activity_status: str, user: discord.abc.Snowflake, guild: discord.Guild, settings: Dict[str, Any]) -> None:
+    async def _notify_call_channels(self, activity_status: str, user: discord.abc.Snowflake, guild: discord.Guild, settings: Dict[str, Any], delay_seconds: int) -> None:
         """Send notifications to call channels about the activity call."""
         guild_name = guild.name
+        delay_text = self._format_delay(delay_seconds)
         for cid in settings.get("call_channel_ids", []):
             ch = self.bot.get_channel(cid)
             if ch:
                 try:
-                   # here_msg = await ch.send("@here")
-                   # await asyncio.sleep(2)
-                   # await here_msg.delete()
-                    await ch.send(f"{user.mention} called **{activity_status}** in 5 minutes!     From: {guild_name}")
+                    await ch.send(f"{user.mention} called **{activity_status}** in {delay_text}!     From: {guild_name}")
                 except Exception:
                     self._get_guild_logger(guild).warning(f"Failed to send notify in channel {cid}")
                     
@@ -264,11 +280,12 @@ class BossCall(commands.Cog):
                     self._get_guild_logger(guild).warning(f"Failed to send timeout notify in channel {cid}")
 
     # ---------------- Cancel Menu Creation ----------------
-    async def _create_cancel_menus(self, activity_status: str, settings: Dict[str, Any], guild: discord.Guild) -> Dict[str, int]:
+    async def _create_cancel_menus(self, activity_status: str, settings: Dict[str, Any], guild: discord.Guild, delay_seconds: int) -> Dict[str, int]:
         """Create cancel menus in command channels and return the updated map."""
         command_channel_ids = settings.get("command_channel_ids", [])
         cancel_map = settings.get("cancel_message_ids", {}) or {}
         guild_logger = self._get_guild_logger(guild)
+        delay_text = self._format_delay(delay_seconds)
 
         for cid in command_channel_ids:
             ch = self.bot.get_channel(cid)
@@ -278,7 +295,7 @@ class BossCall(commands.Cog):
                 embed_cancel = discord.Embed(
                     title="Activity Call Active",
                     description=(
-                        f"**In-Game Message**\n{activity_status} in 5 Min\nCancel {activity_status}\n\n"
+                        f"**In-Game Message**\n{activity_status} in {delay_text}\nCancel {activity_status}\n\n"
                         f"Current activity: **{activity_status}**\n❌ Cancel with notification\n🔕 Clear silently (Completed)"
                     ),
                     color=discord.Color.red(),
@@ -546,7 +563,7 @@ class BossCall(commands.Cog):
             await ctx.send("⚠️ Please mention or provide at least one role ID.")
             return
 
-        resolved_roles = await DiscordConverter.resolve_multiple_roles(self.bot, roles)
+        resolved_roles = await DiscordConverter.resolve_multiple_roles(self.bot, roles, ctx.guild)
         resolved_roles = [r for r in resolved_roles if r.guild == ctx.guild]
         if not resolved_roles:
             await ctx.send("⚠️ No valid roles from this server could be resolved from your input.")
@@ -574,7 +591,7 @@ class BossCall(commands.Cog):
         settings = await self.db.get("bosscall", guild_id, {})
         cmd_channel_ids = settings.get("command_channel_ids", [])
         if not cmd_channel_ids:
-            await ctx.send("❌ No command channels configured. Use set_command_channels first.")
+            await ctx.send("❌ No command channels configured. Use `set_command_channel` first.")
             return
 
         # Cleanup old menus
@@ -626,13 +643,14 @@ class BossCall(commands.Cog):
         guild_id = str(guild.id)
         settings = await self.db.get("bosscall", guild_id, {})
 
-        # Permission check
-        if not await self._check_user_permission(user, guild, settings):
-            await self._safe_remove_reaction(reaction, user)
-            return
-
+        # Only handle reactions on activity menus / cancel messages
         msg_type = self._get_message_type(reaction, settings)
         if msg_type is None:
+            return
+
+        # Permission check (only for actual activity-menu reactions)
+        if not await self._check_user_permission(user, guild, settings):
+            await self._safe_remove_reaction(reaction, user)
             return
 
         emoji = str(reaction.emoji).strip()
@@ -667,10 +685,10 @@ class BossCall(commands.Cog):
             await self._safe_remove_reaction(reaction, user)
 
             # Notify call channels
-            await self._notify_call_channels(activity_status, user, guild, settings)
+            await self._notify_call_channels(activity_status, user, guild, settings, timer)
 
             # Create cancel menus
-            cancel_map = await self._create_cancel_menus(activity_status, settings, guild)
+            cancel_map = await self._create_cancel_menus(activity_status, settings, guild, timer)
             settings["cancel_message_ids"] = cancel_map
             await self.db.set("bosscall", guild_id, settings, save=True)
 
