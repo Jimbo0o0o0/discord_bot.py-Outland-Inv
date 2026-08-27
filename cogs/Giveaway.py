@@ -23,6 +23,8 @@ class GiveawayView(discord.ui.View):
         self.cog = cog
 
     async def update_entries_field(self, message: discord.Message, entrants: list[str]):
+        if not message.embeds:
+            return
         embed = message.embeds[0]
         for i, field in enumerate(embed.fields):
             if field.name.lower() == "entries":
@@ -34,15 +36,18 @@ class GiveawayView(discord.ui.View):
     async def join(self, interaction: discord.Interaction, button: discord.ui.Button):
         msg_id = str(interaction.message.id)
         user_id = str(interaction.user.id)
-        data = await self.cog.storage.get("giveaways", msg_id)
 
-        if not data or data.get("status") != "active":
-            return await interaction.response.send_message("❌ This giveaway is no longer active.", ephemeral=True)
-        if user_id in data["entrants"]:
-            return await interaction.response.send_message("You have already joined this giveaway.", ephemeral=True)
+        async with self.cog._entry_lock(msg_id):
+            data = await self.cog.storage.get("giveaways", msg_id)
 
-        data["entrants"].append(user_id)
-        await self.cog.storage.set("giveaways", msg_id, data)
+            if not data or data.get("status") != "active":
+                return await interaction.response.send_message("❌ This giveaway is no longer active.", ephemeral=True)
+            if user_id in data["entrants"]:
+                return await interaction.response.send_message("You have already joined this giveaway.", ephemeral=True)
+
+            data["entrants"].append(user_id)
+            await self.cog.storage.set("giveaways", msg_id, data)
+
         await self.update_entries_field(interaction.message, data["entrants"])
 
         try:
@@ -50,21 +55,27 @@ class GiveawayView(discord.ui.View):
         except discord.HTTPException:
             pass
 
-        await interaction.response.send_message("✅ You joined the giveaway!", ephemeral=True)
+        if interaction.response.is_done():
+            await interaction.followup.send("✅ You joined the giveaway!", ephemeral=True)
+        else:
+            await interaction.response.send_message("✅ You joined the giveaway!", ephemeral=True)
 
     @discord.ui.button(label="Leave Giveaway", style=discord.ButtonStyle.red, emoji="❌", custom_id="gw_leave")
     async def leave(self, interaction: discord.Interaction, button: discord.ui.Button):
         msg_id = str(interaction.message.id)
         user_id = str(interaction.user.id)
-        data = await self.cog.storage.get("giveaways", msg_id)
 
-        if not data or data.get("status") != "active":
-            return await interaction.response.send_message("❌ This giveaway is no longer active.", ephemeral=True)
-        if user_id not in data["entrants"]:
-            return await interaction.response.send_message("You are not part of this giveaway.", ephemeral=True)
+        async with self.cog._entry_lock(msg_id):
+            data = await self.cog.storage.get("giveaways", msg_id)
 
-        data["entrants"].remove(user_id)
-        await self.cog.storage.set("giveaways", msg_id, data)
+            if not data or data.get("status") != "active":
+                return await interaction.response.send_message("❌ This giveaway is no longer active.", ephemeral=True)
+            if user_id not in data["entrants"]:
+                return await interaction.response.send_message("You are not part of this giveaway.", ephemeral=True)
+
+            data["entrants"].remove(user_id)
+            await self.cog.storage.set("giveaways", msg_id, data)
+
         await self.update_entries_field(interaction.message, data["entrants"])
 
         try:
@@ -72,7 +83,10 @@ class GiveawayView(discord.ui.View):
         except discord.HTTPException:
             pass
 
-        await interaction.response.send_message("You left the giveaway.", ephemeral=True)
+        if interaction.response.is_done():
+            await interaction.followup.send("You left the giveaway.", ephemeral=True)
+        else:
+            await interaction.response.send_message("You left the giveaway.", ephemeral=True)
 
 
 class GiveawayCog(commands.Cog):
@@ -81,15 +95,21 @@ class GiveawayCog(commands.Cog):
         self.storage = bot.db  # AsyncJSONStorage
         self.bot.add_view(GiveawayView(self))
         self._active_tasks = {}  # msg_id -> asyncio.Task
+        self._locks: dict[str, asyncio.Lock] = {}
+
+    def _entry_lock(self, msg_id: str) -> asyncio.Lock:
+        if msg_id not in self._locks:
+            self._locks[msg_id] = asyncio.Lock()
+        return self._locks[msg_id]
 
     async def cog_load(self):
         """Called automatically when cog is loaded (after bot starts)."""
         await self.resume_active_giveaways()
 
     async def _pick_winners(self, entrants: List[str], count: int) -> List[str]:
-        if len(entrants) < count:
+        if not entrants or count < 1:
             return []
-        return random.sample(entrants, count)
+        return random.sample(entrants, min(count, len(entrants)))
 
     async def _disable_buttons(self, message: discord.Message):
         view = GiveawayView(self)
@@ -107,8 +127,11 @@ class GiveawayCog(commands.Cog):
         self, ctx: commands.Context, duration: int, winners: int, title: str,
         channel_input: str = None, *, description: str = ""
     ):
+        """Create a giveaway. Duration is in minutes."""
         if winners < 1:
             return await ctx.send("You must have at least one winner.")
+        if duration < 1:
+            return await ctx.send("Duration must be at least 1 minute.")
 
         duration_seconds = duration * 60
         channel = await DiscordConverter.resolve_channel(self.bot, channel_input, ctx.guild) if channel_input else ctx.channel

@@ -36,12 +36,16 @@ class General(commands.Cog, name="general"):
         for i in self.bot.cogs:
             if i == "owner" and not (await self.bot.is_owner(context.author)):
                 continue
-            cog = self.bot.get_cog(i.lower())
+            cog = self.bot.get_cog(i)
+            if cog is None:
+                continue
             commands = cog.get_commands()
             data = []
             for command in commands:
-                description = command.description.partition("\n")[0]
+                description = command.description.partition("\n")[0] if command.description else ""
                 data.append(f"{command.name} - {description}")
+            if not data:
+                continue
             help_text = "\n".join(data)
             embed.add_field(
                 name=i.capitalize(), value=f"```{help_text}```", inline=False
@@ -56,11 +60,11 @@ class General(commands.Cog, name="general"):
         :param context: The hybrid command context.
         """
         embed = discord.Embed(
-            description="Used [Krypton's](https://krypton.ninja) template",
+            description="UO Outland Discord Helper for Inv. Guild",
             color=0xBEBEFE,
         )
         embed.set_author(name="Bot Information")
-        embed.add_field(name="Owner:", value="Krypton#7331", inline=True)
+        embed.add_field(name="Owner:", value="Inv. Guild", inline=True)
         embed.add_field(
             name="Python Version:", value=f"{platform.python_version()}", inline=True
         )
