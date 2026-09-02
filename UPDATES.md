@@ -12,7 +12,6 @@ Here is the list of all the updates that I made on this bot.
 - Single JSON store, persist `data/` + `logs/` in Docker
 - Stop logging full message contents
 - Giveaway join lock; pick all entrants when fewer than requested winners
-- Help command now lists custom cogs; add `.env.example`
 
 ### Version 1.0.1 (10 October 2025)
 

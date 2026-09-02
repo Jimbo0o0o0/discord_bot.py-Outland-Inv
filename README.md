@@ -8,7 +8,6 @@ Discord helper bot for the Inv. guild on [UO Outlands](https://uooutlands.com).
 - Cross-guild channel sync via webhooks
 - Giveaways with join/leave buttons
 - Outlands wiki, vendor, and map search shortcuts
-- Moderation (kick, ban, purge, archive)
 
 ## How to set up
 
