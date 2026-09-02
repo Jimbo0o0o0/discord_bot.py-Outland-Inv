@@ -5,8 +5,7 @@ import random
 import json
 import io
 from datetime import datetime, timedelta, timezone
-from typing import List
-from utils.utils import DiscordConverter
+from typing import List, Optional
 
 # Start a thread for giveaway management
 # Edit main message when giveaway ends
@@ -125,7 +124,7 @@ class GiveawayCog(commands.Cog):
     @commands.has_permissions(manage_messages=True)
     async def create_giveaway(
         self, ctx: commands.Context, duration: int, winners: int, title: str,
-        channel_input: str = None, *, description: str = ""
+        channel: Optional[discord.TextChannel] = None, *, description: str = ""
     ):
         """Create a giveaway. Duration is in minutes."""
         if winners < 1:
@@ -134,9 +133,8 @@ class GiveawayCog(commands.Cog):
             return await ctx.send("Duration must be at least 1 minute.")
 
         duration_seconds = duration * 60
-        channel = await DiscordConverter.resolve_channel(self.bot, channel_input, ctx.guild) if channel_input else ctx.channel
-        if not channel:
-            return await ctx.send("Invalid channel.")
+        if channel is None:
+            channel = ctx.channel
 
         now = datetime.now(timezone.utc)
         end_time = now + timedelta(seconds=duration_seconds)
