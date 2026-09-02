@@ -262,10 +262,13 @@ class GiveawayCog(commands.Cog):
                 pass
 
         await self._announce_winners(data, msg_id)
-        await self._send_transparency_file(channel, msg_id, data)
+        if channel:
+            await self._send_transparency_file(channel, msg_id, data)
         self._active_tasks.pop(msg_id, None)
 
-    async def _send_transparency_file(self, channel: discord.TextChannel, msg_id: str, data: dict):
+    async def _send_transparency_file(self, channel: Optional[discord.TextChannel], msg_id: str, data: dict):
+        if channel is None:
+            return
         file_data = json.dumps(data, indent=4).encode("utf-8")
         file = discord.File(io.BytesIO(file_data), filename=f"giveaway_{msg_id}.json")
         await channel.send("📜 Giveaway transparency data:", file=file)
