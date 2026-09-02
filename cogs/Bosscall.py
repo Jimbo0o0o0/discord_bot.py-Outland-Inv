@@ -425,9 +425,7 @@ class BossCall(commands.Cog):
 
     # ---------------- Cog lifecycle ----------------
     async def cog_load(self) -> None:
-        """Load BossCall settings from AsyncJSONStorage and ensure defaults exist per guild."""
-        # Load existing database
-        await self.db.load()
+        """Ensure BossCall settings defaults exist per guild (DB is loaded in setup_hook)."""
         coll = self.db._get_collection("bosscall")
 
         updated = False
@@ -477,7 +475,6 @@ class BossCall(commands.Cog):
             except Exception:
                 pass
         self._tasks.clear()
-        await self.db.load()
         coll = self.db._get_collection("bosscall")
         for guild_id_str, settings in list(coll.items()):
             if isinstance(settings, dict):

@@ -282,7 +282,6 @@ class GiveawayCog(commands.Cog):
 
     async def resume_active_giveaways(self):
         """Called on startup to resume active giveaways."""
-        await self.storage.load()
         giveaways = await self.storage.all_dict("giveaways")
 
         resumed = 0
