@@ -7,10 +7,9 @@ import logging
 import logging.handlers
 import os
 import platform
-from typing import Any, Callable, Dict, Optional
 
 import discord
-from discord.ext import commands, tasks
+from discord.ext import commands
 from discord.ext.commands import Context
 from dotenv import load_dotenv
 
@@ -29,7 +28,6 @@ DEFAULT_STATUS = "Watching over Inv. Guild"
 Setup bot intents (events restrictions)
 For more information about intents, please go to the following websites:
 https://discordpy.readthedocs.io/en/latest/intents.html
-https://discordpy.readthedocs.io/en/latest/intents.html#privileged-intents
 
 Default Intents:
 intents.bans = True
@@ -57,7 +55,7 @@ Privileged Intents (Needs to be enabled on developer portal of Discord), please 
 intents = discord.Intents.default()
 intents.members = True
 intents.message_content = True
-intents.presences = True
+intents.presences = False
 
 class LoggingFormatter(logging.Formatter):
     # Colors

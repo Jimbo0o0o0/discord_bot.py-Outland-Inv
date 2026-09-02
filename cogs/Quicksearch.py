@@ -1,4 +1,3 @@
-import discord
 from discord.ext import commands
 from urllib.parse import quote_plus, quote
 

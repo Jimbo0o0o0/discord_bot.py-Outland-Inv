@@ -41,18 +41,18 @@ OTHER_INFO = {
 }
 
 BOSS_INFO = {
-    "1️⃣": "Main Aegis ",  "2️⃣": "Main Cavernam ", "3️⃣": "Main Nusero ",
-    "4️⃣": "Main Ossuary ",  "5️⃣": "Main Mausoleum ",  "6️⃣": "Main Pulma ",
-    "7️⃣": "Main Inferno ","8️⃣": "Main Darkmire ","9️⃣": "Main Petram ",
-    "🔟": "Main Cathedral ", "🇰": "Main Kraul Hive ", "🇼": "Main Wilderness ",
-    "🇴": "Main Ocean's ",
+    "1️⃣": "Main Aegis",  "2️⃣": "Main Cavernam", "3️⃣": "Main Nusero",
+    "4️⃣": "Main Ossuary",  "5️⃣": "Main Mausoleum",  "6️⃣": "Main Pulma",
+    "7️⃣": "Main Inferno","8️⃣": "Main Darkmire","9️⃣": "Main Petram",
+    "🔟": "Main Cathedral", "🇰": "Main Kraul Hive", "🇼": "Main Wilderness",
+    "🇴": "Main Ocean's",
 }
 MINI_BOSS_INFO = {
-    "1️⃣": "Mini Aegis ", "2️⃣": "Mini Cavernam ", "3️⃣": "Mini Nusero ",
-    "4️⃣": "Mini Ossuary ","5️⃣": "Mini Mausoleum ", "6️⃣": "Mini Pulma ",
-    "7️⃣": "Mini Inferno ","8️⃣": "Mini Darkmire ","9️⃣": "Mini Petram ",
-    "🔟": "Mini Cathedral ","🇰": "Mini Kraul Hive ", "🇼": "Mini Wilderness ",
-    "🇴": "Mini Ocean's ",
+    "1️⃣": "Mini Aegis", "2️⃣": "Mini Cavernam", "3️⃣": "Mini Nusero",
+    "4️⃣": "Mini Ossuary","5️⃣": "Mini Mausoleum", "6️⃣": "Mini Pulma",
+    "7️⃣": "Mini Inferno","8️⃣": "Mini Darkmire","9️⃣": "Mini Petram",
+    "🔟": "Mini Cathedral","🇰": "Mini Kraul Hive", "🇼": "Mini Wilderness",
+    "🇴": "Mini Ocean's",
 }
 
 class BossCall(commands.Cog):
@@ -252,7 +252,7 @@ class BossCall(commands.Cog):
             ch = self.bot.get_channel(cid)
             if ch:
                 try:
-                    await ch.send(f"{user.mention} called **{activity_status}** in {delay_text}!     From: {guild_name}")
+                    await ch.send(f"@here {user.mention} called **{activity_status}** in {delay_text}!     From: {guild_name}")
                 except Exception:
                     self._get_guild_logger(guild).warning(f"Failed to send notify in channel {cid}")
                     
@@ -582,9 +582,8 @@ class BossCall(commands.Cog):
             f"{ctx.author} set allowed roles: {[r.id for r in resolved_roles]}"
         )
     @commands.hybrid_command(name="activity_menu", description="Generate or refresh the activity call menu in all command channels.")
-   # @commands.has_permissions(administrator=True)
+    @commands.has_permissions(administrator=True)
     @commands.guild_only()  
-    @commands.is_owner()
     async def activity_menu(self, ctx: commands.Context):
         """Generate or refresh activity call menus in configured command channels."""
         guild_id = str(ctx.guild.id)
