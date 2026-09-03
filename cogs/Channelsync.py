@@ -171,14 +171,6 @@ class WebhookChannelSync(commands.Cog):
 
         target_webhooks = groups[str(message.channel.id)]
 
-        files = []
-        if message.attachments:
-            for a in message.attachments:
-                try:
-                    files.append(await a.to_file())
-                except Exception as e:
-                    print(f"[Webhook Sync] Failed to attach file: {e}")
-
         display_name = f" [{message.guild.name}] → {message.author.display_name}"
         embeds = message.embeds if message.embeds else []
         content = message.content or None
@@ -187,6 +179,14 @@ class WebhookChannelSync(commands.Cog):
 
         for webhook_url in target_webhooks:
             try:
+                # discord.File streams are one-shot, so create fresh files for each webhook.
+                files = []
+                for a in message.attachments:
+                    try:
+                        files.append(await a.to_file())
+                    except Exception as e:
+                        print(f"[Webhook Sync] Failed to attach file: {e}")
+
                 webhook = discord.Webhook.from_url(webhook_url, session=self.session)
                 sent_msg = await webhook.send(
                     content=content,
