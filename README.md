@@ -68,7 +68,7 @@ See [UPDATES.md](UPDATES.md).
 ## Built With
 
 - [discord.py](https://github.com/Rapptz/discord.py)
-- [Python 3.12.9](https://www.python.org/)
+- [Python 3.12](https://www.python.org/)
 
 ## License
 
