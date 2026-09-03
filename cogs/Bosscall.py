@@ -317,7 +317,12 @@ class BossCall(commands.Cog):
         return cancel_map
 
     # ---------------- Cleanup ----------------
-    async def _cleanup_cancel_messages(self, settings: Dict[str, Any], guild: discord.Guild) -> None:
+    async def _cleanup_cancel_messages(
+        self,
+        settings: Dict[str, Any],
+        guild: Optional[discord.Guild],
+        guild_id: Optional[str] = None,
+    ) -> None:
         """Delete all cancel messages and clear the map."""
         cancel_map = settings.get("cancel_message_ids", {}) or {}
         for ch_id_str, msg_id in list(cancel_map.items()):
@@ -326,7 +331,10 @@ class BossCall(commands.Cog):
                 await self._safe_delete_message(ch, msg_id)
             cancel_map.pop(ch_id_str, None)
         settings["cancel_message_ids"] = cancel_map
-        await self.db.set("bosscall", str(guild.id), settings, save=True)
+        storage_guild_id = str(guild.id) if guild else guild_id
+        if storage_guild_id is None:
+            raise ValueError("A guild or guild ID is required to clean up cancel messages.")
+        await self.db.set("bosscall", storage_guild_id, settings, save=True)
 
     # ---------------- Menu Creation Helpers ----------------
     def _create_menu_embed(self, title: str, description: str, info_dict: Dict[str, str]) -> discord.Embed:
@@ -735,7 +743,7 @@ class BossCall(commands.Cog):
 
             async with self._guild_lock(guild_id):
                 self.bot.presence_manager.clear_activity("Bosscall", guild_id)
-                await self._cleanup_cancel_messages(settings, self.bot.get_guild(int(guild_id)) or guild)
+                await self._cleanup_cancel_messages(settings, guild, guild_id)
                 self._tasks.pop(guild_id, None)
                 await self.bot.presence_manager.force_update()
 
