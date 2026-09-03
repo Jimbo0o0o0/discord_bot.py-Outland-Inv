@@ -25,7 +25,7 @@ Enable these privileged intents in the Discord Developer Portal:
 
 - Server Members Intent
 - Message Content Intent
-- Presence Intent
+- Presence Intent (optional) Disabled
 
 ## How to start
 
