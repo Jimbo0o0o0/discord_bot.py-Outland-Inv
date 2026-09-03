@@ -33,6 +33,8 @@ class GiveawayView(discord.ui.View):
 
     @discord.ui.button(label="Join Giveaway", style=discord.ButtonStyle.green, emoji="✅", custom_id="gw_join")
     async def join(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.defer(ephemeral=True)
+
         msg_id = str(interaction.message.id)
         user_id = str(interaction.user.id)
 
@@ -40,9 +42,9 @@ class GiveawayView(discord.ui.View):
             data = await self.cog.storage.get("giveaways", msg_id)
 
             if not data or data.get("status") != "active":
-                return await interaction.response.send_message("❌ This giveaway is no longer active.", ephemeral=True)
+                return await interaction.followup.send("❌ This giveaway is no longer active.", ephemeral=True)
             if user_id in data["entrants"]:
-                return await interaction.response.send_message("You have already joined this giveaway.", ephemeral=True)
+                return await interaction.followup.send("You have already joined this giveaway.", ephemeral=True)
 
             data["entrants"].append(user_id)
             await self.cog.storage.set("giveaways", msg_id, data)
@@ -54,10 +56,7 @@ class GiveawayView(discord.ui.View):
         except discord.HTTPException:
             pass
 
-        if interaction.response.is_done():
-            await interaction.followup.send("✅ You joined the giveaway!", ephemeral=True)
-        else:
-            await interaction.response.send_message("✅ You joined the giveaway!", ephemeral=True)
+        await interaction.followup.send("✅ You joined the giveaway!", ephemeral=True)
 
     @discord.ui.button(label="Leave Giveaway", style=discord.ButtonStyle.red, emoji="❌", custom_id="gw_leave")
     async def leave(self, interaction: discord.Interaction, button: discord.ui.Button):
