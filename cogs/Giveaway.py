@@ -268,9 +268,34 @@ class GiveawayCog(commands.Cog):
     async def _send_transparency_file(self, channel: Optional[discord.TextChannel], msg_id: str, data: dict):
         if channel is None:
             return
-        file_data = json.dumps(data, indent=4).encode("utf-8")
+
+        transparency_data = data.copy()
+        transparency_data["host_id"] = await self._user_name(data.get("host_id"))
+        transparency_data["channel_id"] = channel.name
+        transparency_data["guild_id"] = channel.guild.name if channel.guild else "Unknown Guild"
+        transparency_data["entrants"] = [
+            await self._user_name(user_id) for user_id in data.get("entrants", [])
+        ]
+        transparency_data["winners"] = [
+            await self._user_name(user_id) for user_id in data.get("winners", [])
+        ]
+
+        file_data = json.dumps(transparency_data, indent=4).encode("utf-8")
         file = discord.File(io.BytesIO(file_data), filename=f"giveaway_{msg_id}.json")
         await channel.send("📜 Giveaway transparency data:", file=file)
+
+    async def _user_name(self, user_id) -> str:
+        """Resolve a user ID without exposing it in the public giveaway export."""
+        if user_id is None:
+            return "Unknown User"
+
+        user = self.bot.get_user(int(user_id))
+        if user is None:
+            try:
+                user = await self.bot.fetch_user(int(user_id))
+            except (discord.NotFound, discord.HTTPException):
+                return "Unknown User"
+        return user.name
 
     def _schedule_giveaway_end(self, msg_id: str, data: dict):
         """Starts the background countdown for a giveaway."""
