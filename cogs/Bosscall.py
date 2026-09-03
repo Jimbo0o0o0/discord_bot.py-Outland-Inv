@@ -143,7 +143,7 @@ class BossCall(commands.Cog):
         """Check if the user has permission to trigger an activity call."""
         allowed_roles = set(settings.get("allowed_roles", []))
         if not allowed_roles:
-            return True  # No roles specified, allow all
+            return False  # No roles specified
 
         if not hasattr(user, "roles"):
             try:
