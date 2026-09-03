@@ -1,4 +1,5 @@
 from discord.ext import commands
+#TODO: Auto role management for new member using secrete password 
 
 class Welcome(commands.Cog):
     def __init__(self, bot):

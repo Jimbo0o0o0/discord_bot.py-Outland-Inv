@@ -5,15 +5,15 @@ from discord.ext import commands
 from typing import Optional, Dict, Any
 from utils.utils import DiscordConverter
 #
-# TODO: Implement new menu (Faction VIP dungeon) global activity status most reaction change the current activity
+# TODO: Implement new menu (Faction VIP, dungeon, activity) global activity status most reaction change the current activity
 # TODO: Add minipool for boss run yes/no
 # TODO: bot status also display cancelled/completed boss
-# TODO: Remove rework Ocean boss
+# TODO: Remove rework Ocean boss "🇴": "Mini Ocean's", "🇴": "Main Ocean's", "🇴": "Omni Boss", ,"🇴"
 
-Boss_emojs = ["1️⃣","2️⃣","3️⃣","4️⃣","5️⃣","6️⃣","7️⃣","8️⃣","9️⃣","🔟","🇰","🇼","🇴"]
+Boss_emojs = ["1️⃣","2️⃣","3️⃣","4️⃣","5️⃣","6️⃣","7️⃣","8️⃣","9️⃣","🔟","🇰","🇼"]
 Mini_Boss_emojs = Boss_emojs.copy()
 cancel_emojis = ["❌","🔕"]
-other_emojs = ["1️⃣","2️⃣","3️⃣","4️⃣","5️⃣","6️⃣","7️⃣","8️⃣","🇨","🇴"]
+other_emojs = ["1️⃣","2️⃣","3️⃣","4️⃣","5️⃣","6️⃣","7️⃣","8️⃣","🇨"]
             
 TOWN_INFO = {
     "1️⃣": "Prevalia",
@@ -37,7 +37,6 @@ OTHER_INFO = {
     "7️⃣": "Humility",
     "8️⃣": "Spirituality",
     "🇨": "Trade Caravan",
-    "🇴": "Omni Boss",
 }
 
 BOSS_INFO = {
@@ -45,14 +44,12 @@ BOSS_INFO = {
     "4️⃣": "Main Ossuary",  "5️⃣": "Main Mausoleum",  "6️⃣": "Main Pulma",
     "7️⃣": "Main Inferno","8️⃣": "Main Darkmire","9️⃣": "Main Petram",
     "🔟": "Main Cathedral", "🇰": "Main Kraul Hive", "🇼": "Main Wilderness",
-    "🇴": "Main Ocean's",
 }
 MINI_BOSS_INFO = {
     "1️⃣": "Mini Aegis", "2️⃣": "Mini Cavernam", "3️⃣": "Mini Nusero",
     "4️⃣": "Mini Ossuary","5️⃣": "Mini Mausoleum", "6️⃣": "Mini Pulma",
     "7️⃣": "Mini Inferno","8️⃣": "Mini Darkmire","9️⃣": "Mini Petram",
     "🔟": "Mini Cathedral","🇰": "Mini Kraul Hive", "🇼": "Mini Wilderness",
-    "🇴": "Mini Ocean's",
 }
 
 class BossCall(commands.Cog):

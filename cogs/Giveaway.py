@@ -7,6 +7,7 @@ import io
 from datetime import datetime, timedelta, timezone
 from typing import List, Optional
 
+#TODO:
 # Start a thread for giveaway management
 # Edit main message when giveaway ends
 # Remove button after giveaway ends and replace by clear button to remove the thread

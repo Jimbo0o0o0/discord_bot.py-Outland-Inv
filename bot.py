@@ -15,14 +15,6 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-# TEST: multi guild
-# on_guild_join
-# on_member_join
-# on_ready
-# on_guild_remove
-#role management and secret pass roles
-#general management commands
-
 DEFAULT_STATUS = "Watching over Inv. Guild"
 """	
 Setup bot intents (events restrictions)
