@@ -227,7 +227,11 @@ class BossCall(commands.Cog):
         active_guild_name = active_guild.name if active_guild else "another guild"
 
         await self._safe_remove_reaction(reaction, user)
-        await user.send(f"An activity **{active_status}** is already active in {active_guild_name}.")
+        
+        try:
+            await user.send(f"An activity **{active_status}** is already active in {active_guild_name}.")
+        except discord.HTTPException:
+            pass
         self._get_guild_logger(guild).info(f"Blocked global duplicate activity call by {user} ({user.id})")
         return True
 
