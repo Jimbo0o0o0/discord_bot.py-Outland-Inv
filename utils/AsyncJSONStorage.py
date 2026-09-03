@@ -3,6 +3,8 @@ import asyncio
 import json
 import os
 import copy
+import shutil
+import tempfile
 from typing import Any, Callable, Dict, Optional
 
 class AsyncJSONStorage:
@@ -72,10 +74,28 @@ class AsyncJSONStorage:
             if not changed and not force:
                 return
 
-            #await self._rotate_backups()
+            parent = os.path.dirname(os.path.abspath(self.filename)) or "."
+            temp_filename = None
+            try:
+                with tempfile.NamedTemporaryFile(
+                    mode="w",
+                    encoding="utf-8",
+                    dir=parent,
+                    prefix=f".{os.path.basename(self.filename)}.",
+                    suffix=".tmp",
+                    delete=False,
+                ) as temp_file:
+                    temp_filename = temp_file.name
+                    json.dump(self._data, temp_file, indent=4)
+                    temp_file.flush()
+                    os.fsync(temp_file.fileno())
 
-            async with aiofiles.open(self.filename, "w") as f:
-                await f.write(json.dumps(self._data, indent=4))
+                await self._rotate_backups()
+                os.replace(temp_filename, self.filename)
+                temp_filename = None
+            finally:
+                if temp_filename and os.path.exists(temp_filename):
+                    os.unlink(temp_filename)
 
             self._last_saved = copy.deepcopy(self._data)
             if self.logger:
@@ -90,7 +110,10 @@ class AsyncJSONStorage:
             dst = f"{self.filename}.bak{i}"
             if os.path.exists(src):
                 try:
-                    os.replace(src, dst)
+                    if i == 1:
+                        shutil.copy2(src, dst)
+                    else:
+                        os.replace(src, dst)
                     if self.logger:
                         self.logger.base_logger.debug(f"Rotated backup {src} to {dst}")
                 except Exception as e:
@@ -125,7 +148,9 @@ class AsyncJSONStorage:
         return self._data[name]
 
     async def get(self, collection: str, key: str, default: Any = None) -> Any:
-        return self._get_collection(collection).get(str(key), default)
+        async with self.lock:
+            value = self._get_collection(collection).get(str(key), default)
+            return copy.deepcopy(value)
 
     async def set(self, collection: str, key: str, value: Any, save: bool = True) -> None:
         """Set a value, trigger on_change, and optionally schedule save."""
