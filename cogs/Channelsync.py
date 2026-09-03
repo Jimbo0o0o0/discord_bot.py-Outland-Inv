@@ -25,9 +25,17 @@ class WebhookChannelSync(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
         self.storage = bot.db  # AsyncJSONStorage instance
-        self.session = aiohttp.ClientSession()
+        self.session: Optional[aiohttp.ClientSession] = None
         # message_map[src_channel_id][src_msg_id] = {webhook_id: target_msg_id}
         self.message_map: Dict[int, Dict[int, Dict[str, int]]] = {}
+
+    async def cog_load(self):
+        self.session = aiohttp.ClientSession()
+
+    def _get_session(self) -> aiohttp.ClientSession:
+        if self.session is None:
+            raise RuntimeError("WebhookChannelSync has not been loaded")
+        return self.session
 
     async def _get_bot_webhook(self, channel: discord.TextChannel) -> Optional[discord.Webhook]:
         try:
@@ -187,7 +195,7 @@ class WebhookChannelSync(commands.Cog):
                     except Exception as e:
                         print(f"[Webhook Sync] Failed to attach file: {e}")
 
-                webhook = discord.Webhook.from_url(webhook_url, session=self.session)
+                webhook = discord.Webhook.from_url(webhook_url, session=self._get_session())
                 sent_msg = await webhook.send(
                     content=content,
                     username=display_name[:80],
@@ -228,7 +236,7 @@ class WebhookChannelSync(commands.Cog):
                 target_msg_id = self.message_map.get(after.channel.id, {}).get(after.id, {}).get(webhook_id)
                 if not target_msg_id:
                     continue
-                webhook = discord.Webhook.from_url(webhook_url, session=self.session)
+                webhook = discord.Webhook.from_url(webhook_url, session=self._get_session())
                 await webhook.edit_message(target_msg_id, content=f"{after.content} *(edited)*")
             except Exception as e:
                 print(f"[Webhook Sync] Edit error: {e}")
@@ -252,7 +260,7 @@ class WebhookChannelSync(commands.Cog):
                 target_msg_id = self.message_map.get(message.channel.id, {}).get(message.id, {}).get(webhook_id)
                 if not target_msg_id:
                     continue
-                webhook = discord.Webhook.from_url(webhook_url, session=self.session)
+                webhook = discord.Webhook.from_url(webhook_url, session=self._get_session())
                 await webhook.delete_message(target_msg_id)
             except Exception as e:
                 print(f"[Webhook Sync] Delete error: {e}")
@@ -261,7 +269,9 @@ class WebhookChannelSync(commands.Cog):
     # 🧹 CLEANUP
     # ------------------------------------------------------------
     async def cog_unload(self):
-        await self.session.close()
+        if self.session is not None:
+            await self.session.close()
+            self.session = None
 
 
 async def setup(bot: commands.Bot):
