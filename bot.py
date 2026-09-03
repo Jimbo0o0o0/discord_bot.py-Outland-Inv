@@ -404,7 +404,7 @@ class DiscordBot(commands.Bot):
                 await context.send(embed=embed)
                 logger.error(
                     f"Unhandled command error for '{context.command}' by {context.author} (ID: {context.author.id}) in {context.guild.name if context.guild else 'DMs'}: {error}",
-                    exc_info=error.__traceback__
+                    exc_info=(type(error), error, error.__traceback__)
                 )
 
         except discord.HTTPException as http_error:
@@ -416,7 +416,7 @@ class DiscordBot(commands.Bot):
             # Catch any other errors during error handling
             logger.error(
                 f"Unexpected error while handling command error for '{context.command}' in {context.guild.name if context.guild else 'DMs'}: {send_error}",
-                exc_info=send_error.__traceback__
+                exc_info=(type(send_error), send_error, send_error.__traceback__)
             ) 
             
 def main():
