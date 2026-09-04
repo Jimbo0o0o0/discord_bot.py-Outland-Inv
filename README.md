@@ -58,7 +58,7 @@ https://discord.com/oauth2/authorize?client_id=YOUR_CLIENT_ID&permissions=268461
 Granting **Administrator** also covers every permission above, but the list is the minimum the bot actually uses.
 
 ## How to start
-
+Use start.bat or 
 ### The "usual" way
 
 Install dependencies:
@@ -119,10 +119,6 @@ docker compose up -d --build         # rebuild after a code change
 ## Issues or Questions
 
 Open an issue on this repository.
-
-## Versioning
-
-See [UPDATES.md](UPDATES.md).
 
 ## Built With
 
