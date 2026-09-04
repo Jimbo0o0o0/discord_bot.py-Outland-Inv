@@ -2,7 +2,7 @@ import discord
 from discord.ext import commands
 import aiohttp
 from typing import Dict, List, Optional
-from utils.utils import DiscordConverter
+from utils.Converter import DiscordConverter
 
 
 MAX_MAP_ENTRIES = 2000  # per channel limit

@@ -3,7 +3,7 @@ import asyncio
 import discord
 from discord.ext import commands
 from typing import Optional, Dict, Any
-from utils.utils import DiscordConverter
+from utils.Converter import DiscordConverter
 #
 # TODO: Implement new menu (Faction VIP, dungeon, activity) global activity status most reaction change the current activity
 # TODO: Add minipool for boss run yes/no

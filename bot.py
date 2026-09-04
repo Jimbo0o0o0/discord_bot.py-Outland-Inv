@@ -1,6 +1,6 @@
 
 from utils.AsyncJSONStorage import AsyncJSONStorage
-from utils.utils import PresenceManager
+from utils.PresenceManager import PresenceManager
 
 import asyncio
 import logging
