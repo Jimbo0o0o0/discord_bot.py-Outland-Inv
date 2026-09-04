@@ -3,7 +3,7 @@ from discord.ext import commands
 import re
 
 class DiscordConverter:
-    """Utility class to resolve Discord role and channel inputs from mentions, IDs, or names."""
+    """Utility class to resolve Discord role, channel, and user inputs from mentions, IDs, or names."""
 
     @staticmethod
     async def resolve_role(bot: commands.Bot, role_input: str, guild: discord.Guild = None) -> discord.Role | None:
@@ -93,6 +93,79 @@ class DiscordConverter:
         return None
 
     @staticmethod
+    def _user_names(user: discord.User | discord.Member) -> list[str]:
+        names = [user.name]
+        display_name = getattr(user, "display_name", None)
+        global_name = getattr(user, "global_name", None)
+        if display_name:
+            names.append(display_name)
+        if global_name:
+            names.append(global_name)
+        return names
+
+    @staticmethod
+    async def resolve_user(bot: commands.Bot, user_input: str, guild: discord.Guild = None) -> discord.User | None:
+        """Resolve a user from a mention, ID, or name. Prefer the given guild, then search caches / fetch."""
+        user_id = None
+        user_name = None
+
+        if user_input.startswith("<@") and not user_input.startswith("<@&") and user_input.endswith(">"):
+            user_id = user_input[2:-1].lstrip("!")
+        elif user_input.isdigit():
+            user_id = user_input
+        else:
+            user_name = user_input.lower()
+
+        if user_id:
+            try:
+                user_id_int = int(user_id)
+            except ValueError:
+                return None
+
+            if guild:
+                member = guild.get_member(user_id_int)
+                if member:
+                    return member
+                try:
+                    return await guild.fetch_member(user_id_int)
+                except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+                    pass
+
+            for g in bot.guilds:
+                member = g.get_member(user_id_int)
+                if member:
+                    return member
+
+            user = bot.get_user(user_id_int)
+            if user:
+                return user
+            try:
+                return await bot.fetch_user(user_id_int)
+            except (discord.NotFound, discord.HTTPException):
+                return None
+
+        if user_name:
+            def _matches(u: discord.User | discord.Member) -> bool:
+                return any(n.lower() == user_name for n in DiscordConverter._user_names(u) if n)
+
+            search_guilds = [guild] if guild else list(bot.guilds)
+            for g in search_guilds:
+                if g is None:
+                    continue
+                member = discord.utils.find(_matches, g.members)
+                if member:
+                    return member
+            if guild:
+                for g in bot.guilds:
+                    member = discord.utils.find(_matches, g.members)
+                    if member:
+                        return member
+            user = discord.utils.find(_matches, bot.users)
+            if user:
+                return user
+        return None
+
+    @staticmethod
     async def resolve_multiple_channels(bot: commands.Bot, inputs_str: str, guild: discord.Guild = None) -> list[discord.TextChannel]:
         """Parse space-separated channel inputs (names/mentions/IDs) into a list of TextChannels."""
         if not inputs_str.strip():
@@ -119,3 +192,17 @@ class DiscordConverter:
             if role:
                 roles.append(role)
         return roles
+
+    @staticmethod
+    async def resolve_multiple_user(bot: commands.Bot, inputs_str: str, guild: discord.Guild = None) -> list[discord.User]:
+        """Parse space-separated user inputs (names/mentions/IDs) into a list of Users."""
+        if not inputs_str.strip():
+            return []
+
+        parts = [part.strip() for part in re.split(r"\s+", inputs_str) if part.strip()]
+        users = []
+        for part in parts:
+            user = await DiscordConverter.resolve_user(bot, part, guild)
+            if user:
+                users.append(user)
+        return users
