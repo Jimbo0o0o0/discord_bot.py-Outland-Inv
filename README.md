@@ -21,11 +21,41 @@ INVITE_LINK=your_bot_invite_url
 
 Alternatively, set the same names as system environment variables.
 
-Enable these privileged intents in the Discord Developer Portal:
+### Privileged intents (Developer Portal)
+
+Enable these under **Bot → Privileged Gateway Intents**:
 
 - Server Members Intent
 - Message Content Intent
-- Presence Intent (optional) Disabled
+- Presence Intent is **not** required (leave it disabled)
+
+### Bot permissions (server admin)
+
+When inviting the bot, a server admin must grant these permissions. They are already encoded in the sample `INVITE_LINK` in `.env.example` (`permissions=2684611664`).
+
+| Permission | Why the bot needs it |
+| --- | --- |
+| View Channels | Read command, call, and synced channels |
+| Send Messages | Commands, activity pings, giveaways, welcome messages |
+| Embed Links | Boss menus, giveaways, error replies |
+| Attach Files | Giveaway transparency export |
+| Add Reactions | Activity-call menus |
+| Manage Messages | Remove used reactions, delete old menus, drop unsupported replies in synced channels |
+| Read Message History | Fetch messages to edit, delete, or clean up |
+| Mention Everyone | `@here` on activity calls |
+| Manage Webhooks | Cross-guild channel sync |
+| Manage Channels | Update channel topics when linking synced channels |
+| Use Application Commands | Slash commands |
+
+After the invite, keep the bot's role high enough in **Server Settings → Roles** that it can manage messages and webhooks in those channels. Channel permission overwrites can still block the bot even if the invite succeeded.
+
+Invite URL (replace `YOUR_CLIENT_ID`):
+
+```
+https://discord.com/oauth2/authorize?client_id=YOUR_CLIENT_ID&permissions=2684611664&scope=bot%20applications.commands
+```
+
+Granting **Administrator** also covers every permission above, but the list is the minimum the bot actually uses.
 
 ## How to start
 
