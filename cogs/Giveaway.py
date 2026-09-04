@@ -6,6 +6,7 @@ import json
 import io
 from datetime import datetime, timedelta, timezone
 from typing import List, Optional
+from utils.Converter import DiscordConverter
 
 #TODO:
 # Start a thread for giveaway management
@@ -116,6 +117,11 @@ class GiveawayCog(commands.Cog):
             item.disabled = True
         await message.edit(view=view)
 
+    async def _resolve_channel(
+        self, channel_input: str, guild: Optional[discord.Guild] = None
+    ) -> Optional[discord.TextChannel]:
+        return await DiscordConverter.resolve_channel(self.bot, channel_input, guild)
+
     @commands.group(name="giveaway", invoke_without_command=True)
     async def giveaway(self, ctx: commands.Context):
         await ctx.send_help(ctx.command)
@@ -124,9 +130,9 @@ class GiveawayCog(commands.Cog):
     @commands.has_permissions(manage_messages=True)
     async def create_giveaway(
         self, ctx: commands.Context, duration: int, winners: int, title: str,
-        channel: Optional[discord.TextChannel] = None, *, description: str = ""
+        channel: Optional[str] = None, *, description: str = ""
     ):
-        """Create a giveaway. Duration is in minutes."""
+        """Create a giveaway. Duration is in minutes. Channel can be a mention, name, or ID."""
         if winners < 1:
             return await ctx.send("You must have at least one winner.")
         if duration < 1:
@@ -134,7 +140,14 @@ class GiveawayCog(commands.Cog):
 
         duration_seconds = duration * 60
         if channel is None:
-            channel = ctx.channel
+            target_channel = ctx.channel
+        else:
+            target_channel = await self._resolve_channel(channel, ctx.guild)
+            if not target_channel:
+                return await ctx.send("❌ Invalid or not found channel.")
+
+        if not isinstance(target_channel, discord.TextChannel):
+            return await ctx.send("❌ Giveaways can only be created in text channels.")
 
         now = datetime.now(timezone.utc)
         end_time = now + timedelta(seconds=duration_seconds)
@@ -146,14 +159,14 @@ class GiveawayCog(commands.Cog):
         embed.add_field(name="Entries", value="0")
 
         view = GiveawayView(self)
-        msg = await channel.send(embed=embed, view=view)
+        msg = await target_channel.send(embed=embed, view=view)
         data = {
             "title": title,
             "description": description,
             "duration": duration_seconds,
             "winners_count": winners,
             "host_id": ctx.author.id,
-            "channel_id": channel.id,
+            "channel_id": target_channel.id,
             "guild_id": ctx.guild.id,
             "entrants": [],
             "status": "active",
@@ -163,7 +176,7 @@ class GiveawayCog(commands.Cog):
 
         msg_id = str(msg.id)
         await self.storage.set("giveaways", msg_id, data)
-        await ctx.send(f"✅ Giveaway **{title}** started in {channel.mention} and ends {discord.utils.format_dt(end_time, 'R')}.")
+        await ctx.send(f"✅ Giveaway **{title}** started in {target_channel.mention} and ends {discord.utils.format_dt(end_time, 'R')}.")
 
         self._schedule_giveaway_end(msg_id, data)
 
@@ -202,7 +215,8 @@ class GiveawayCog(commands.Cog):
         if task:
             task.cancel()
 
-        channel = self.bot.get_channel(data["channel_id"])
+        guild = self.bot.get_guild(int(data["guild_id"])) if data.get("guild_id") else ctx.guild
+        channel = await self._resolve_channel(str(data["channel_id"]), guild)
         if channel:
             try:
                 msg = await channel.fetch_message(int(msg_id))
@@ -217,7 +231,8 @@ class GiveawayCog(commands.Cog):
         await ctx.send("✅ Giveaway cancelled.")
 
     async def _announce_winners(self, data: dict, msg_id: str, reroll: bool = False):
-        channel = self.bot.get_channel(data["channel_id"])
+        guild = self.bot.get_guild(int(data["guild_id"])) if data.get("guild_id") else None
+        channel = await self._resolve_channel(str(data["channel_id"]), guild)
         if not channel:
             return
 
@@ -253,7 +268,8 @@ class GiveawayCog(commands.Cog):
         data["winners"] = winners
         await self.storage.set("giveaways", msg_id, data)
 
-        channel = self.bot.get_channel(data["channel_id"])
+        guild = self.bot.get_guild(int(data["guild_id"])) if data.get("guild_id") else None
+        channel = await self._resolve_channel(str(data["channel_id"]), guild)
         if channel:
             try:
                 msg = await channel.fetch_message(int(msg_id))
