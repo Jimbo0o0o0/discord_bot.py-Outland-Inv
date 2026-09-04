@@ -79,13 +79,42 @@ After the bot is online, run `!sync guild` (bot owner only) so slash commands ap
 
 ### Docker
 
-After installing [Docker](https://docker.com):
+[Docker](https://docs.docker.com/get-docker/) with Compose V2 (`docker compose`) is required. The compose file **will not start** without a `.env` in the repo root — it is loaded via `env_file`.
+
+1. Copy `.env.example` to `.env` and set a real `TOKEN` (the process exits immediately if it is missing).
+2. From the repo root:
 
 ```
 docker compose up -d --build
 ```
 
-> **Note**: `-d` runs the container in the background. Bot data is stored in `./data` and logs in `./logs`.
+That builds image `uo-outland-guild-helper` and starts the `discord-bot` service. `restart: unless-stopped` brings it back after a reboot until you stop it yourself.
+
+Bind mounts (created automatically if they do not exist):
+
+| Host | Container | Used for |
+| --- | --- | --- |
+| `./data` | `/bot/data` | JSON store (`data.json`, giveaways, channel sync) |
+| `./logs` | `/bot/logs` | Rotating bot logs |
+
+`.env` is **not** copied into the image (see `.dockerignore`). Compose injects it at runtime. Do not put `TOKEN` in `docker-compose.yml` — that file is tracked by git.
+
+Follow logs to confirm login (needed because `-d` hides startup errors):
+
+```
+docker compose logs -f discord-bot
+```
+
+You should see `is now online and ready!`. Then run `!sync guild` in Discord (bot owner only).
+
+Useful commands:
+
+```
+docker compose logs -f discord-bot   # follow logs
+docker compose restart discord-bot   # restart
+docker compose down                  # stop
+docker compose up -d --build         # rebuild after a code change
+```
 
 ## Issues or Questions
 
