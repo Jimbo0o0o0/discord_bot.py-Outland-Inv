@@ -16,7 +16,6 @@ from utils.Converter import DiscordConverter
 #
 
 ACTIVITY_KEY = "Eventcall"
-BOSS_ACTIVITY_KEY = "Bosscall"
 DEFAULT_MINUTES = 15
 MIN_MINUTES = 1
 MAX_MINUTES = 1440  # 24 hours
@@ -258,26 +257,25 @@ class EventCall(commands.Cog):
 
         return True
 
-    def _get_blocking_activity(self) -> Optional[tuple[str, dict]]:
-        pm = self.bot.presence_manager
-        for key in (ACTIVITY_KEY, BOSS_ACTIVITY_KEY):
-            if pm.has_activity(key):
-                return key, pm.activity_status[key]
-        return None
+    def _presence_key(self, guild_id: str) -> str:
+        """Per-guild presence slot so EventCall never collides with Bosscall or other servers."""
+        return f"{ACTIVITY_KEY}:{guild_id}"
 
-    def _blocking_message(self, blocking: tuple[str, dict]) -> str:
-        key, activity = blocking
-        active_status = activity.get("text", "an activity")
-        active_guild_id = activity.get("guild")
-        active_guild = None
-        if active_guild_id is not None:
-            try:
-                active_guild = self.bot.get_guild(int(active_guild_id))
-            except (TypeError, ValueError):
-                active_guild = None
-        active_guild_name = active_guild.name if active_guild else "another guild"
-        kind = "boss call" if key == BOSS_ACTIVITY_KEY else "event call"
-        return f"A {kind} **{active_status}** is already active in {active_guild_name}."
+    def _active_event_name(self, guild_id: str, settings: Optional[Dict[str, Any]] = None) -> Optional[str]:
+        """Return this guild's active custom event name, if any."""
+        stored = (settings or {}).get("active") or {}
+        if stored.get("name"):
+            return stored["name"]
+        task = self._tasks.get(guild_id)
+        if task is not None and not task.done():
+            activity = self.bot.presence_manager.activity_status.get(self._presence_key(guild_id))
+            if activity and activity.get("text"):
+                return activity["text"]
+            return "event"
+        activity = self.bot.presence_manager.activity_status.get(self._presence_key(guild_id))
+        if activity and activity.get("guild") == str(guild_id) and activity.get("text"):
+            return activity["text"]
+        return None
 
     # ---------------- Notifications ----------------
 
@@ -457,7 +455,7 @@ class EventCall(commands.Cog):
                     remaining = 0
 
             self.bot.presence_manager.set_activity(
-                ACTIVITY_KEY, name, priority=10, activity_guild=str(guild_id)
+                self._presence_key(str(guild_id)), name, priority=10, activity_guild=str(guild_id)
             )
             user = None
             if user_id:
@@ -478,7 +476,10 @@ class EventCall(commands.Cog):
                 pass
         self._tasks.clear()
         try:
-            self.bot.presence_manager.clear_activity(ACTIVITY_KEY)
+            pm = self.bot.presence_manager
+            for key in list(pm.activity_status):
+                if key == ACTIVITY_KEY or key.startswith(f"{ACTIVITY_KEY}:"):
+                    pm.clear_activity(key)
         except Exception:
             pass
         coll = self.db._get_collection("eventcall")
@@ -545,13 +546,18 @@ class EventCall(commands.Cog):
         delay_text = self._format_delay(delay_seconds)
 
         async with self._guild_lock(guild_id):
-            blocking = self._get_blocking_activity()
-            if blocking:
-                await self._respond(source, f"⚠️ {self._blocking_message(blocking)}", ephemeral=True)
+            existing = self._active_event_name(guild_id, settings)
+            if existing:
+                await self._respond(
+                    source,
+                    f"⚠️ A custom event **{existing}** is already active in this server. "
+                    f"Use `eventcancel` or `eventdone` first.",
+                    ephemeral=True,
+                )
                 return
 
             self.bot.presence_manager.set_activity(
-                ACTIVITY_KEY, name, priority=10, activity_guild=guild_id
+                self._presence_key(guild_id), name, priority=10, activity_guild=guild_id
             )
 
             await self._notify_call_channels(name, user, guild, settings, delay_seconds)
@@ -605,16 +611,11 @@ class EventCall(commands.Cog):
         guild_logger = self._get_guild_logger(guild)
 
         async with self._guild_lock(guild_id):
-            activity = self.bot.presence_manager.activity_status.get(ACTIVITY_KEY)
+            activity = self.bot.presence_manager.activity_status.get(self._presence_key(guild_id))
             stored = settings.get("active") or {}
             if not activity and not stored:
-                blocking = self._get_blocking_activity()
-                if blocking and blocking[0] == BOSS_ACTIVITY_KEY:
-                    msg = "⚠️ No custom event call is active. A boss call is currently active — use the boss cancel menu."
-                else:
-                    msg = "⚠️ No custom event call is active."
                 if source is not None:
-                    await self._respond(source, msg, ephemeral=True)
+                    await self._respond(source, "⚠️ No custom event call is active.", ephemeral=True)
                 return
 
             activity_status = (activity or {}).get("text") or stored.get("name") or "event"
@@ -623,7 +624,7 @@ class EventCall(commands.Cog):
             if task := self._tasks.pop(guild_id, None):
                 task.cancel()
 
-            self.bot.presence_manager.clear_activity(ACTIVITY_KEY, guild_id)
+            self.bot.presence_manager.clear_activity(self._presence_key(guild_id), guild_id)
             await self._cleanup_cancel_messages(settings, guild)
             await self.bot.presence_manager.force_update()
 
@@ -738,19 +739,12 @@ class EventCall(commands.Cog):
 
     async def _send_status(self, source: Source, guild: discord.Guild) -> None:
         settings = await self._load_settings(str(guild.id))
+        guild_id = str(guild.id)
         active = settings.get("active")
-        presence = self.bot.presence_manager.activity_status.get(ACTIVITY_KEY)
+        presence = self.bot.presence_manager.activity_status.get(self._presence_key(guild_id))
 
         if not active and not presence:
-            blocking = self._get_blocking_activity()
-            if blocking and blocking[0] == BOSS_ACTIVITY_KEY:
-                await self._respond(
-                    source,
-                    f"No custom event call is active. {self._blocking_message(blocking)}",
-                    ephemeral=True,
-                )
-            else:
-                await self._respond(source, "No custom event call is active.", ephemeral=True)
+            await self._respond(source, "No custom event call is active.", ephemeral=True)
             return
 
         name = (active or {}).get("name") or (presence or {}).get("text") or "event"
@@ -920,7 +914,7 @@ class EventCall(commands.Cog):
                     await self._notify_timeout(activity_status, target, guild, settings)
 
             async with self._guild_lock(guild_id):
-                self.bot.presence_manager.clear_activity(ACTIVITY_KEY, guild_id)
+                self.bot.presence_manager.clear_activity(self._presence_key(guild_id), guild_id)
                 await self._cleanup_cancel_messages(settings, guild, guild_id)
                 self._tasks.pop(guild_id, None)
                 await self.bot.presence_manager.force_update()

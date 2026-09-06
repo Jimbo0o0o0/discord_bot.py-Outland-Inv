@@ -39,7 +39,7 @@ While a custom event is active:
 | Complete (no cancel ping) | `!eventdone` / `/eventdone` | 🔕 on the cancel embed |
 | Check what is running | `!eventstatus` / `/eventstatus` | bot presence |
 
-Only one boss call **or** custom event can be active at a time. After deploying this cog, run `!sync guild` (bot owner) so the new slash commands appear.
+Only one custom event can be active **per server** at a time. Boss calls are independent — a boss and a custom event can run together. After deploying this cog, run `!sync guild` (bot owner) so the new slash commands appear.
 
 ## How to set up
 
