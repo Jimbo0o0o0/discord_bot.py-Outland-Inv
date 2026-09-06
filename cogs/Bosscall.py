@@ -14,6 +14,7 @@ Boss_emojs = ["1️⃣","2️⃣","3️⃣","4️⃣","5️⃣","6️⃣","7️�
 Mini_Boss_emojs = Boss_emojs.copy()
 cancel_emojis = ["❌","🔕"]
 other_emojs = ["1️⃣","2️⃣","3️⃣","4️⃣","5️⃣","6️⃣","7️⃣","8️⃣","🇨"]
+ACTIVITY_KEYS = ("Bosscall", "Eventcall")
             
 TOWN_INFO = {
     "1️⃣": "Prevalia",
@@ -212,15 +213,27 @@ class BossCall(commands.Cog):
         return None
 
     # ---------------- Global Activity Check ----------------
+    def _get_blocking_activity(self) -> Optional[tuple]:
+        """Return (key, activity dict) if a boss or custom event call is already active."""
+        pm = self.bot.presence_manager
+        for key in ACTIVITY_KEYS:
+            if pm.has_activity(key):
+                return key, pm.activity_status[key]
+        return None
+
     async def _check_global_activity_conflict(self, reaction: discord.Reaction, user: discord.abc.Snowflake, guild: discord.Guild) -> bool:
         """Check for global activity conflict and notify if present. Returns True if conflict exists."""
-        if not self.bot.presence_manager.has_activity("Bosscall"):
+        blocking = self._get_blocking_activity()
+        if not blocking:
             return False
 
-        activity = self.bot.presence_manager.activity_status["Bosscall"]
+        _key, activity = blocking
         active_status = activity["text"]
         active_guild_id = activity["guild"]
-        active_guild = self.bot.get_guild(int(active_guild_id))
+        try:
+            active_guild = self.bot.get_guild(int(active_guild_id))
+        except (TypeError, ValueError):
+            active_guild = None
         active_guild_name = active_guild.name if active_guild else "another guild"
 
         await self._safe_remove_reaction(reaction, user)
