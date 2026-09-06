@@ -11,8 +11,12 @@ from discord.ext import commands
 from utils.Converter import DiscordConverter
 
 #
-# Custom event calls — same ping / cancel / timer / presence flow as BossCall,
+# Custom event calls — same ping / cancel / timer / presence *display* as BossCall,
 # but created with a command instead of a reaction menu.
+#
+# Locks are independent of Bosscall: EventCall never reads or writes the
+# "Bosscall" presence slot or Bosscall's asyncio locks. Occupancy is tracked
+# per guild in this cog's own store (`eventcall` / _tasks / _event_locks).
 #
 
 ACTIVITY_KEY = "Eventcall"
@@ -74,21 +78,23 @@ def sanitize_event_name(name: str) -> str:
 
 
 class EventCall(commands.Cog):
-    """Custom event calls via command — pings, cancel menu, timer, presence."""
+    """Custom event calls via command. Independent of Bosscall; one active call per guild."""
 
     def __init__(self, bot: commands.Bot):
         self.bot = bot
         self.db = bot.db
         self.presence_manager = bot.presence_manager
         self._tasks: Dict[str, asyncio.Task] = {}
-        self._locks: Dict[str, asyncio.Lock] = {}
+        # Per-guild EventCall lock only — never shared with Bosscall.
+        self._event_locks: Dict[str, asyncio.Lock] = {}
 
     # ---------------- Helpers ----------------
 
-    def _guild_lock(self, guild_id: str) -> asyncio.Lock:
-        if guild_id not in self._locks:
-            self._locks[guild_id] = asyncio.Lock()
-        return self._locks[guild_id]
+    def _event_lock(self, guild_id: str) -> asyncio.Lock:
+        """Return this cog's per-guild lock. Independent from BossCall._guild_lock."""
+        if guild_id not in self._event_locks:
+            self._event_locks[guild_id] = asyncio.Lock()
+        return self._event_locks[guild_id]
 
     def _get_guild_logger(self, guild: discord.Guild):
         logger = getattr(self.bot, "logger", None)
@@ -258,23 +264,17 @@ class EventCall(commands.Cog):
         return True
 
     def _presence_key(self, guild_id: str) -> str:
-        """Per-guild presence slot so EventCall never collides with Bosscall or other servers."""
+        """Display-only presence slot. Not used as a lock; Bosscall uses 'Bosscall'."""
         return f"{ACTIVITY_KEY}:{guild_id}"
 
     def _active_event_name(self, guild_id: str, settings: Optional[Dict[str, Any]] = None) -> Optional[str]:
-        """Return this guild's active custom event name, if any."""
+        """This guild's active EventCall name, from EventCall state only (not Bosscall)."""
         stored = (settings or {}).get("active") or {}
         if stored.get("name"):
             return stored["name"]
         task = self._tasks.get(guild_id)
         if task is not None and not task.done():
-            activity = self.bot.presence_manager.activity_status.get(self._presence_key(guild_id))
-            if activity and activity.get("text"):
-                return activity["text"]
             return "event"
-        activity = self.bot.presence_manager.activity_status.get(self._presence_key(guild_id))
-        if activity and activity.get("guild") == str(guild_id) and activity.get("text"):
-            return activity["text"]
         return None
 
     # ---------------- Notifications ----------------
@@ -545,7 +545,8 @@ class EventCall(commands.Cog):
         delay_seconds = minutes * 60
         delay_text = self._format_delay(delay_seconds)
 
-        async with self._guild_lock(guild_id):
+        async with self._event_lock(guild_id):
+            settings = await self._load_settings(guild_id)
             existing = self._active_event_name(guild_id, settings)
             if existing:
                 await self._respond(
@@ -607,18 +608,18 @@ class EventCall(commands.Cog):
         is_cancel: bool,
     ) -> None:
         guild_id = str(guild.id)
-        settings = await self._load_settings(guild_id)
         guild_logger = self._get_guild_logger(guild)
 
-        async with self._guild_lock(guild_id):
-            activity = self.bot.presence_manager.activity_status.get(self._presence_key(guild_id))
+        async with self._event_lock(guild_id):
+            settings = await self._load_settings(guild_id)
             stored = settings.get("active") or {}
-            if not activity and not stored:
+            if not self._active_event_name(guild_id, settings):
                 if source is not None:
                     await self._respond(source, "⚠️ No custom event call is active.", ephemeral=True)
                 return
 
-            activity_status = (activity or {}).get("text") or stored.get("name") or "event"
+            activity = self.bot.presence_manager.activity_status.get(self._presence_key(guild_id))
+            activity_status = stored.get("name") or (activity or {}).get("text") or "event"
             await self._notify_cancel_or_complete(activity_status, user, guild, settings, is_cancel)
 
             if task := self._tasks.pop(guild_id, None):
@@ -913,14 +914,14 @@ class EventCall(commands.Cog):
                 if target is not None:
                     await self._notify_timeout(activity_status, target, guild, settings)
 
-            async with self._guild_lock(guild_id):
+            async with self._event_lock(guild_id):
                 self.bot.presence_manager.clear_activity(self._presence_key(guild_id), guild_id)
                 await self._cleanup_cancel_messages(settings, guild, guild_id)
                 self._tasks.pop(guild_id, None)
                 await self.bot.presence_manager.force_update()
 
         except asyncio.CancelledError:
-            async with self._guild_lock(guild_id):
+            async with self._event_lock(guild_id):
                 self._tasks.pop(guild_id, None)
             return
 
