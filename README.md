@@ -5,9 +5,41 @@ Discord helper bot for the Inv. guild on [UO Outlands](https://uooutlands.com).
 ## Features
 
 - Boss / mini-boss / other activity call menus (reactions + presence)
+- Custom event calls via command (`!eventcall` / `/eventcall`) — same pings, cancel menu, timer, and presence as boss calls
 - Cross-guild channel sync via webhooks
 - Giveaways with join/leave buttons
 - Outlands wiki, vendor, and map search shortcuts
+
+## Custom event calls
+
+Call anything that is not on the boss menu (Faction VIP, dungeon, treasure map, and so on) with a command instead of a reaction.
+
+```
+!eventcall Faction VIP
+!eventcall Dungeon for 20
+!eventcall 2h Treasure Map
+/eventcall name:Faction VIP minutes:20
+```
+
+The number is **how long the event lasts** (timeout), not time until it starts. Pings and the in-game line use `event_name for 20 minutes`. Default duration is **15 minutes**. Mentions in the name are escaped.
+
+Call channels, command channels, and allowed roles **reuse the existing boss-call settings** unless you override them with:
+
+- `set_event_call_channels`
+- `set_event_command_channel`
+- `set_event_allowed_roles`
+
+Server administrators can always use the command.
+
+While a custom event is active:
+
+| Action | Command | Also |
+| --- | --- | --- |
+| Cancel (pings call channels) | `!eventcancel` / `/eventcancel` | ❌ on the cancel embed |
+| Complete (no cancel ping) | `!eventdone` / `/eventdone` | 🔕 on the cancel embed |
+| Check what is running | `!eventstatus` / `/eventstatus` | bot presence |
+
+Only one custom event can be active **per server** at a time. Boss calls are independent — a boss and a custom event can run together. After deploying this cog, run `!sync guild` (bot owner) so the new slash commands appear.
 
 ## How to set up
 
