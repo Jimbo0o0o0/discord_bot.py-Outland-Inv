@@ -16,12 +16,12 @@ Call anything that is not on the boss menu (Faction VIP, dungeon, treasure map, 
 
 ```
 !eventcall Faction VIP
-!eventcall Dungeon in 20
+!eventcall Dungeon for 20
 !eventcall 2h Treasure Map
 /eventcall name:Faction VIP minutes:20
 ```
 
-Default delay is **15 minutes**, matching a boss call. Mentions in the name are escaped.
+The number is **how long the event lasts** (timeout), not time until it starts. Pings and the in-game line use `event_name for 20 minutes`. Default duration is **15 minutes**. Mentions in the name are escaped.
 
 Call channels, command channels, and allowed roles **reuse the existing boss-call settings** unless you override them with:
 

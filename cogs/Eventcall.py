@@ -26,9 +26,10 @@ MAX_MINUTES = 1440  # 24 hours
 MAX_NAME_LENGTH = 80
 cancel_emojis = ["❌", "🔕"]
 
-# "Faction VIP in 20", "Dungeon in 15m", "Treasure Map in 2 hours"
-_TRAILING_IN = re.compile(
-    r"^(?P<name>.+?)\s+in\s+(?P<num>\d+)\s*(?P<unit>m|min|mins|minutes|h|hr|hrs|hour|hours)?\s*$",
+# "Faction VIP for 20", "Dungeon for 15m", "Treasure Map for 2 hours"
+# "in" is still accepted as an alias for the duration.
+_TRAILING_DURATION = re.compile(
+    r"^(?P<name>.+?)\s+(?:for|in)\s+(?P<num>\d+)\s*(?P<unit>m|min|mins|minutes|h|hr|hrs|hour|hours)?\s*$",
     re.IGNORECASE,
 )
 # "20 Faction VIP", "15m Dungeon", "2h Treasure Map"
@@ -49,12 +50,14 @@ def _minutes_from_match(match: re.Match) -> int:
 
 
 def parse_event_call_args(details: str, default_minutes: int = DEFAULT_MINUTES) -> tuple[str, int]:
-    """Parse `!eventcall` text into (name, minutes).
+    """Parse `!eventcall` text into (name, duration_minutes).
+
+    The number is how long the event lasts (timeout), not time until it starts.
 
     Accepted forms:
       Faction VIP
-      Faction VIP in 20
-      Dungeon in 15m
+      Faction VIP for 20
+      Dungeon for 15m
       20 Faction VIP
       2h Treasure Map
     """
@@ -62,7 +65,7 @@ def parse_event_call_args(details: str, default_minutes: int = DEFAULT_MINUTES) 
     if not details:
         raise ValueError("Event name is required.")
 
-    for pattern in (_TRAILING_IN, _LEADING_DURATION):
+    for pattern in (_TRAILING_DURATION, _LEADING_DURATION):
         match = pattern.match(details)
         if match:
             name = match.group("name").strip(" \"'")
@@ -145,7 +148,7 @@ class EventCall(commands.Cog):
         except Exception:
             return False
 
-    def _format_delay(self, seconds: int) -> str:
+    def _format_duration(self, seconds: int) -> str:
         minutes = max(1, seconds // 60)
         if minutes == 1:
             return "1 minute"
@@ -285,16 +288,16 @@ class EventCall(commands.Cog):
         user: discord.abc.Snowflake,
         guild: discord.Guild,
         settings: Dict[str, Any],
-        delay_seconds: int,
+        duration_seconds: int,
     ) -> None:
         guild_name = guild.name
-        delay_text = self._format_delay(delay_seconds)
+        duration_text = self._format_duration(duration_seconds)
         for cid in settings.get("call_channel_ids", []):
             ch = self.bot.get_channel(cid)
             if ch:
                 try:
                     await ch.send(
-                        f"@here {user.mention} called **{activity_status}** in {delay_text}!     From: {guild_name}"
+                        f"@here {user.mention} called **{activity_status}** for {duration_text}!     From: {guild_name}"
                     )
                 except Exception:
                     self._get_guild_logger(guild).warning(f"Failed to send notify in channel {cid}")
@@ -348,12 +351,12 @@ class EventCall(commands.Cog):
         activity_status: str,
         settings: Dict[str, Any],
         guild: discord.Guild,
-        delay_seconds: int,
+        duration_seconds: int,
     ) -> Dict[str, int]:
         command_channel_ids = settings.get("command_channel_ids", [])
         cancel_map: Dict[str, int] = {}
         guild_logger = self._get_guild_logger(guild)
-        delay_text = self._format_delay(delay_seconds)
+        duration_text = self._format_duration(duration_seconds)
 
         for cid in command_channel_ids:
             ch = self.bot.get_channel(cid)
@@ -363,7 +366,7 @@ class EventCall(commands.Cog):
                 embed_cancel = discord.Embed(
                     title="Custom Event Call Active",
                     description=(
-                        f"**In-Game Message**\n{activity_status} in {delay_text}\nCancel {activity_status}\n\n"
+                        f"**In-Game Message**\n{activity_status} for {duration_text}\nCancel {activity_status}\n\n"
                         f"Current activity: **{activity_status}**\n"
                         f"❌ Cancel with notification\n🔕 Clear silently (Completed)"
                     ),
@@ -460,8 +463,12 @@ class EventCall(commands.Cog):
             user = None
             if user_id:
                 user = self.bot.get_user(int(user_id))
-            delay = max(0, remaining)
-            task = asyncio.create_task(self._event_timer_task(str(guild_id), name, user, int(delay) if delay > 0 else 0))
+            remaining_seconds = max(0, remaining)
+            task = asyncio.create_task(
+                self._event_timer_task(
+                    str(guild_id), name, user, int(remaining_seconds) if remaining_seconds > 0 else 0
+                )
+            )
             self._tasks[str(guild_id)] = task
             resumed += 1
 
@@ -498,9 +505,9 @@ class EventCall(commands.Cog):
 
     def _validate_minutes(self, minutes: int) -> Optional[str]:
         if minutes < MIN_MINUTES:
-            return f"Delay must be at least {MIN_MINUTES} minute."
+            return f"Duration must be at least {MIN_MINUTES} minute."
         if minutes > MAX_MINUTES:
-            return f"Delay cannot exceed {MAX_MINUTES} minutes (24 hours)."
+            return f"Duration cannot exceed {MAX_MINUTES} minutes (24 hours)."
         return None
 
     async def _start_event_call(
@@ -542,8 +549,8 @@ class EventCall(commands.Cog):
             )
             return
 
-        delay_seconds = minutes * 60
-        delay_text = self._format_delay(delay_seconds)
+        duration_seconds = minutes * 60
+        duration_text = self._format_duration(duration_seconds)
 
         async with self._event_lock(guild_id):
             settings = await self._load_settings(guild_id)
@@ -561,24 +568,24 @@ class EventCall(commands.Cog):
                 self._presence_key(guild_id), name, priority=10, activity_guild=guild_id
             )
 
-            await self._notify_call_channels(name, user, guild, settings, delay_seconds)
+            await self._notify_call_channels(name, user, guild, settings, duration_seconds)
 
-            cancel_map = await self._create_cancel_menus(name, settings, guild, delay_seconds)
+            cancel_map = await self._create_cancel_menus(name, settings, guild, duration_seconds)
             settings["cancel_message_ids"] = cancel_map
             settings["active"] = {
                 "name": name,
                 "user_id": user.id,
-                "timeout": delay_seconds,
+                "timeout": duration_seconds,
                 "started_at": datetime.now(timezone.utc).isoformat(),
             }
             await self._save_event_state(guild_id, settings)
 
             if task := self._tasks.pop(guild_id, None):
                 task.cancel()
-            task = asyncio.create_task(self._event_timer_task(guild_id, name, user, delay_seconds))
+            task = asyncio.create_task(self._event_timer_task(guild_id, name, user, duration_seconds))
             self._tasks[guild_id] = task
 
-        confirm = f"✅ Called **{name}** in {delay_text}."
+        confirm = f"✅ Called **{name}** for {duration_text}."
         # Avoid a second public message in a call channel; slash confirms stay ephemeral.
         call_ids = set(settings.get("call_channel_ids", []))
         channel_id = None
@@ -596,7 +603,7 @@ class EventCall(commands.Cog):
                 pass
 
         self._get_guild_logger(guild).info(
-            f"{user} started custom event call '{name}' ({delay_text}) in guild {guild_id}"
+            f"{user} started custom event call '{name}' ({duration_text}) in guild {guild_id}"
         )
 
     async def _stop_event_call(
@@ -645,7 +652,7 @@ class EventCall(commands.Cog):
 
         Examples:
           !eventcall Faction VIP
-          !eventcall Dungeon in 20
+          !eventcall Dungeon for 20
           !eventcall 2h Treasure Map
         """
         try:
@@ -659,7 +666,7 @@ class EventCall(commands.Cog):
     @app_commands.guild_only()
     @app_commands.describe(
         name="Event name to call (e.g. Faction VIP, Dungeon)",
-        minutes="Minutes until the event starts (default 15)",
+        minutes="How long the event lasts, in minutes (default 15). The call times out after this.",
     )
     async def eventcall_slash(
         self,
@@ -751,14 +758,14 @@ class EventCall(commands.Cog):
         name = (active or {}).get("name") or (presence or {}).get("text") or "event"
         timeout = int((active or {}).get("timeout") or 0)
         started_at = (active or {}).get("started_at")
-        remaining_text = self._format_delay(timeout) if timeout else "unknown"
+        remaining_text = self._format_duration(timeout) if timeout else "unknown"
         if started_at and timeout:
             try:
                 started = datetime.fromisoformat(started_at)
                 if started.tzinfo is None:
                     started = started.replace(tzinfo=timezone.utc)
                 remaining = timeout - (datetime.now(timezone.utc) - started).total_seconds()
-                remaining_text = self._format_delay(max(1, int(remaining))) if remaining > 0 else "ending now"
+                remaining_text = self._format_duration(max(1, int(remaining))) if remaining > 0 else "ending now"
             except (TypeError, ValueError):
                 pass
 
