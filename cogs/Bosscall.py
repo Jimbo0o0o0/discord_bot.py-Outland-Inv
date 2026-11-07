@@ -9,6 +9,7 @@ from utils.Converter import DiscordConverter
 # TODO: Add minipool for boss run yes/no
 # TODO: bot status also display cancelled/completed boss
 # TODO: Remove rework Ocean boss "🇴": "Mini Ocean's", "🇴": "Main Ocean's", "🇴": "Omni Boss", ,"🇴"
+# TODO: Anouncement global allaience or local guild
 
 Boss_emojs = ["1️⃣","2️⃣","3️⃣","4️⃣","5️⃣","6️⃣","7️⃣","8️⃣","9️⃣","🔟","🇰","🇼"]
 Mini_Boss_emojs = Boss_emojs.copy()
